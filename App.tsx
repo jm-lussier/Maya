@@ -11,7 +11,8 @@ const App: React.FC = () => {
     disconnect, 
     messages,
     flaggedEvents, 
-    volume 
+    volume,
+    error 
   } = useGeminiLive();
 
   const [showDashboard, setShowDashboard] = useState(false);
@@ -52,6 +53,7 @@ const App: React.FC = () => {
           onDisconnect={disconnect}
           volume={volume}
           messages={messages}
+          error={error}
         />
       </main>
 
