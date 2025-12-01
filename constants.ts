@@ -39,4 +39,6 @@ export const FLAGGED_KEYWORDS = [
   'bully', 'bullied', 'hitting me', 'hitting my'
 ];
 
-export const VOICE_NAME = 'Aoede'; // Friendly, higher pitch, suitable for a "big sister"
+// Changed to Kore, which is a supported Live API voice. 
+// Aoede is TTS-only in some contexts.
+export const VOICE_NAME = 'Kore';
