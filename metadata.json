@@ -1,0 +1,7 @@
+{
+  "name": "Maya - Your Big Sister AI",
+  "description": "A supportive, voice-activated mentor for teenagers with active safety guardrails and real-time parent monitoring.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
