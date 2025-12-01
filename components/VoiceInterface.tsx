@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Mic, MicOff, PhoneOff, MessageSquare } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, MessageSquare, AlertCircle } from 'lucide-react';
 import { ConnectionState, Message } from '../types';
 import AudioVisualizer from './AudioVisualizer';
 
@@ -9,6 +9,7 @@ interface VoiceInterfaceProps {
   onDisconnect: () => void;
   volume: number;
   messages: Message[];
+  error: string | null;
 }
 
 const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ 
@@ -16,7 +17,8 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({
   onConnect, 
   onDisconnect, 
   volume,
-  messages 
+  messages,
+  error 
 }) => {
   const isConnected = connectionState === ConnectionState.CONNECTED;
   const isConnecting = connectionState === ConnectionState.CONNECTING;
@@ -62,6 +64,14 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({
              </div>
         )}
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="w-full max-w-[85%] bg-rose-500/10 border border-rose-500/50 rounded-lg p-3 mb-2 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-rose-200">{error}</p>
+        </div>
+      )}
 
       {/* Full Transcript (Flexible height) */}
       <div className="flex-1 w-full px-4 mb-6 overflow-hidden relative min-h-0 bg-slate-900/20 rounded-xl border border-slate-800/50 backdrop-blur-sm">
