@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { MODEL_NAME, SYSTEM_INSTRUCTION, VOICE_NAME, FLAGGED_KEYWORDS } from '../constants';
+import { MODEL_NAME, SYSTEM_INSTRUCTION, DEFAULT_VOICE_NAME, FLAGGED_KEYWORDS } from '../constants';
 import { ConnectionState, Message, FlaggedEvent } from '../types';
 import { createBlob, decode, decodeAudioData } from '../utils/audioUtils';
 
@@ -8,6 +8,11 @@ export const useGeminiLive = () => {
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
   const [volume, setVolume] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Initialize voice from localStorage
+  const [voiceName, setVoiceName] = useState<string>(() => {
+    return localStorage.getItem('maya-voice') || DEFAULT_VOICE_NAME;
+  });
 
   // Initialize state from localStorage if available
   const [messages, setMessages] = useState<Message[]>(() => {
@@ -45,6 +50,10 @@ export const useGeminiLive = () => {
   useEffect(() => {
     localStorage.setItem('maya-events', JSON.stringify(flaggedEvents));
   }, [flaggedEvents]);
+
+  useEffect(() => {
+    localStorage.setItem('maya-voice', voiceName);
+  }, [voiceName]);
 
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -84,7 +93,7 @@ export const useGeminiLive = () => {
   }, []);
 
   const connect = useCallback(async () => {
-    console.log("Attempting to connect...");
+    console.log("Attempting to connect with voice:", voiceName);
     setError(null);
     let apiKey = '';
     
@@ -110,6 +119,14 @@ export const useGeminiLive = () => {
       
       inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      
+      // Force resume mainly for mobile browsers
+      if (inputAudioContextRef.current.state === 'suspended') {
+        await inputAudioContextRef.current.resume();
+      }
+      if (outputAudioContextRef.current.state === 'suspended') {
+        await outputAudioContextRef.current.resume();
+      }
       
       const analyser = outputAudioContextRef.current.createAnalyser();
       analyser.fftSize = 256;
@@ -230,8 +247,8 @@ export const useGeminiLive = () => {
               currentOutputTransRef.current = ''; 
             }
           },
-          onclose: () => {
-            console.log('Gemini Live Connection Closed');
+          onclose: (event) => {
+            console.log('Gemini Live Connection Closed', event);
             setConnectionState(ConnectionState.DISCONNECTED);
           },
           onerror: (err) => {
@@ -243,10 +260,9 @@ export const useGeminiLive = () => {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE_NAME } }
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } }
           },
           systemInstruction: { parts: [ { text: SYSTEM_INSTRUCTION } ] },
-          // FIX: Pass empty objects, do not pass model name
           inputAudioTranscription: { },
           outputAudioTranscription: { },
         }
@@ -262,17 +278,20 @@ export const useGeminiLive = () => {
       setConnectionState(ConnectionState.ERROR);
       setError(error.message || "An unexpected error occurred.");
     }
-  }, [checkForFlags]);
+  }, [checkForFlags, voiceName]);
 
   const disconnect = useCallback(() => {
     if (currentSessionRef.current) {
-      // Attempt to close the session cleanly if supported
-      try {
-         // Some versions of the SDK expose close, otherwise just drop connection
-         // currentSessionRef.current.close(); 
-      } catch (e) {
-        console.warn("Could not close session explicitly", e);
-      }
+       // Attempt to close session if supported in this SDK version
+       try {
+         // @ts-ignore
+         if (typeof currentSessionRef.current.close === 'function') {
+            // @ts-ignore
+            currentSessionRef.current.close();
+         }
+       } catch (e) {
+          console.log("Session close method not available");
+       }
     }
 
     if (inputSourceRef.current) {
@@ -328,6 +347,8 @@ export const useGeminiLive = () => {
     messages,
     flaggedEvents,
     volume,
-    error
+    error,
+    voiceName,
+    setVoiceName
   };
 };
