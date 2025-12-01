@@ -39,6 +39,12 @@ export const FLAGGED_KEYWORDS = [
   'bully', 'bullied', 'hitting me', 'hitting my'
 ];
 
-// Changed to Kore, which is a supported Live API voice. 
-// Aoede is TTS-only in some contexts.
-export const VOICE_NAME = 'Kore';
+export const AVAILABLE_VOICES = [
+  { name: 'Kore', label: 'Kore (Balanced, Calm)' },
+  { name: 'Zephyr', label: 'Zephyr (Bright, Energetic)' },
+  { name: 'Puck', label: 'Puck (Playful, Soft)' },
+  { name: 'Charon', label: 'Charon (Deep, Steady)' },
+  { name: 'Fenrir', label: 'Fenrir (Deep, Resonant)' },
+];
+
+export const DEFAULT_VOICE_NAME = 'Kore';

@@ -12,7 +12,9 @@ const App: React.FC = () => {
     messages,
     flaggedEvents, 
     volume,
-    error 
+    error,
+    voiceName,
+    setVoiceName
   } = useGeminiLive();
 
   const [showDashboard, setShowDashboard] = useState(false);
@@ -62,6 +64,8 @@ const App: React.FC = () => {
         <ParentDashboard 
           events={flaggedEvents}
           onClose={() => setShowDashboard(false)}
+          voiceName={voiceName}
+          onVoiceChange={setVoiceName}
         />
       )}
     </div>
