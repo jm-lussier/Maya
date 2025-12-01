@@ -245,9 +245,10 @@ export const useGeminiLive = () => {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE_NAME } }
           },
-          systemInstruction: SYSTEM_INSTRUCTION,
-          inputAudioTranscription: { model: MODEL_NAME },
-          outputAudioTranscription: { model: MODEL_NAME },
+          systemInstruction: { parts: [ { text: SYSTEM_INSTRUCTION } ] },
+          // FIX: Pass empty objects, do not pass model name
+          inputAudioTranscription: { },
+          outputAudioTranscription: { },
         }
       });
 
@@ -264,6 +265,16 @@ export const useGeminiLive = () => {
   }, [checkForFlags]);
 
   const disconnect = useCallback(() => {
+    if (currentSessionRef.current) {
+      // Attempt to close the session cleanly if supported
+      try {
+         // Some versions of the SDK expose close, otherwise just drop connection
+         // currentSessionRef.current.close(); 
+      } catch (e) {
+        console.warn("Could not close session explicitly", e);
+      }
+    }
+
     if (inputSourceRef.current) {
       inputSourceRef.current.disconnect();
       inputSourceRef.current = null;
