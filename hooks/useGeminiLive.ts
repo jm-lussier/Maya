@@ -6,7 +6,8 @@ import { createBlob, decode, decodeAudioData } from '../utils/audioUtils';
 
 export const useGeminiLive = () => {
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
-  const [volume, setVolume] = useState<number>(0); // For visualizer
+  const [volume, setVolume] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
 
   // Initialize state from localStorage if available
   const [messages, setMessages] = useState<Message[]>(() => {
@@ -37,17 +38,14 @@ export const useGeminiLive = () => {
     return [];
   });
 
-  // Persist messages whenever they change
   useEffect(() => {
     localStorage.setItem('maya-messages', JSON.stringify(messages));
   }, [messages]);
 
-  // Persist flagged events whenever they change
   useEffect(() => {
     localStorage.setItem('maya-events', JSON.stringify(flaggedEvents));
   }, [flaggedEvents]);
 
-  // Refs for audio handling to avoid re-renders
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -58,19 +56,14 @@ export const useGeminiLive = () => {
   const nextStartTimeRef = useRef<number>(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
-  const currentSessionRef = useRef<any>(null); // To track active session for cleanup
+  const currentSessionRef = useRef<any>(null);
 
-  // Transcription accumulation
   const currentInputTransRef = useRef<string>('');
   const currentOutputTransRef = useRef<string>('');
 
   const checkForFlags = useCallback((text: string, source: 'user' | 'model') => {
     const lowerText = text.toLowerCase();
-    
-    // Use word boundaries (\b) to ensure we match whole words
-    // e.g., "skill" won't trigger "kill", but "kill myself" will trigger "kill"
     const foundKeyword = FLAGGED_KEYWORDS.find(k => {
-      // Escape potential regex special characters in keyword (simple implementation)
       const escapedK = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
       const pattern = new RegExp(`\\b${escapedK}\\b`, 'i');
       return pattern.test(lowerText);
@@ -82,7 +75,6 @@ export const useGeminiLive = () => {
         keyword: foundKeyword,
         context: text,
         timestamp: new Date(),
-        // Determine severity based on keyword category
         severity: ['suicide', 'die', 'kill', 'weapon', 'hurt myself', 'cut myself'].some(k => foundKeyword.includes(k)) 
           ? 'high' 
           : 'medium'
@@ -92,15 +84,30 @@ export const useGeminiLive = () => {
   }, []);
 
   const connect = useCallback(async () => {
-    if (!process.env.API_KEY) {
-      console.error("API Key not found");
+    console.log("Attempting to connect...");
+    setError(null);
+    let apiKey = '';
+    
+    // Safety check for API Key access
+    try {
+      // @ts-ignore - configured via vite define
+      apiKey = process.env.API_KEY || '';
+    } catch (e) {
+      console.error("Environment check failed", e);
+      setError("Environment Error: process.env is not defined. Ensure you have a 'vite.config.ts' file and Vercel build configured.");
+      return;
+    }
+
+    if (!apiKey) {
+      console.error("API Key missing");
+      setError("API Key is missing. Please check your Vercel Environment Variables.");
       return;
     }
 
     try {
       setConnectionState(ConnectionState.CONNECTING);
+      console.log("Initializing AudioContexts...");
       
-      // Initialize Audio Contexts
       inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       
@@ -112,10 +119,20 @@ export const useGeminiLive = () => {
       outputNodeRef.current.connect(analyser);
       analyser.connect(outputAudioContextRef.current.destination);
 
-      // Get Microphone Stream
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      let stream;
+      try {
+        console.log("Requesting microphone access...");
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("Microphone access granted.");
+      } catch (err) {
+        console.error("Microphone error", err);
+        setError("Microphone access denied. Please enable microphone permissions in your browser settings.");
+        setConnectionState(ConnectionState.DISCONNECTED);
+        return;
+      }
       
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      console.log("Initializing Gemini Client...");
+      const ai = new GoogleGenAI({ apiKey });
       
       const sessionPromise = ai.live.connect({
         model: MODEL_NAME,
@@ -124,21 +141,17 @@ export const useGeminiLive = () => {
             console.log('Gemini Live Connection Opened');
             setConnectionState(ConnectionState.CONNECTED);
             
-            // Setup Input Processing
             if (!inputAudioContextRef.current) return;
             
             const source = inputAudioContextRef.current.createMediaStreamSource(stream);
             inputSourceRef.current = source;
             
-            // 4096 buffer size for balance between latency and performance
             const processor = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
             processorRef.current = processor;
             
             processor.onaudioprocess = (e) => {
               const inputData = e.inputBuffer.getChannelData(0);
               const pcmBlob = createBlob(inputData);
-              
-              // Send audio to Gemini
               sessionPromise.then(session => {
                 session.sendRealtimeInput({ media: pcmBlob });
               });
@@ -148,7 +161,6 @@ export const useGeminiLive = () => {
             processor.connect(inputAudioContextRef.current.destination);
           },
           onmessage: async (message: LiveServerMessage) => {
-            // Handle Transcription
             if (message.serverContent?.outputTranscription) {
               const text = message.serverContent.outputTranscription.text;
               currentOutputTransRef.current += text;
@@ -184,7 +196,6 @@ export const useGeminiLive = () => {
               currentOutputTransRef.current = '';
             }
 
-            // Handle Audio Output
             const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (base64Audio && outputAudioContextRef.current && outputNodeRef.current) {
               const ctx = outputAudioContextRef.current;
@@ -210,15 +221,13 @@ export const useGeminiLive = () => {
               sourcesRef.current.add(source);
             }
 
-            // Handle Interruption
             if (message.serverContent?.interrupted) {
-              console.log("Model interrupted");
               sourcesRef.current.forEach(src => {
                 src.stop();
               });
               sourcesRef.current.clear();
               nextStartTimeRef.current = 0;
-              currentOutputTransRef.current = ''; // Clear stale transcription
+              currentOutputTransRef.current = ''; 
             }
           },
           onclose: () => {
@@ -228,6 +237,7 @@ export const useGeminiLive = () => {
           onerror: (err) => {
             console.error('Gemini Live Error', err);
             setConnectionState(ConnectionState.ERROR);
+            setError("Connection error. The service might be temporarily unavailable.");
           }
         },
         config: {
@@ -246,14 +256,14 @@ export const useGeminiLive = () => {
         currentSessionRef.current = session;
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to connect:", error);
       setConnectionState(ConnectionState.ERROR);
+      setError(error.message || "An unexpected error occurred.");
     }
   }, [checkForFlags]);
 
   const disconnect = useCallback(() => {
-    // Stop Microphone
     if (inputSourceRef.current) {
       inputSourceRef.current.disconnect();
       inputSourceRef.current = null;
@@ -267,7 +277,6 @@ export const useGeminiLive = () => {
       inputAudioContextRef.current = null;
     }
 
-    // Stop Output
     sourcesRef.current.forEach(src => src.stop());
     sourcesRef.current.clear();
     if (outputAudioContextRef.current) {
@@ -275,16 +284,9 @@ export const useGeminiLive = () => {
       outputAudioContextRef.current = null;
     }
 
-    // Close Session
-    if (currentSessionRef.current) {
-      // Note: SDK session closure is handled by context destruction largely,
-      // but explicit close calls can be added if SDK supports it in future versions.
-    }
-    
     setConnectionState(ConnectionState.DISCONNECTED);
   }, []);
 
-  // Visualizer loop
   useEffect(() => {
     let animationFrameId: number;
     
@@ -292,8 +294,6 @@ export const useGeminiLive = () => {
       if (analyserRef.current) {
         const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
         analyserRef.current.getByteFrequencyData(dataArray);
-        
-        // Calculate average volume
         const sum = dataArray.reduce((a, b) => a + b, 0);
         const avg = sum / dataArray.length;
         setVolume(avg);
@@ -316,6 +316,7 @@ export const useGeminiLive = () => {
     disconnect,
     messages,
     flaggedEvents,
-    volume // 0-255 scale
+    volume,
+    error
   };
 };
