@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FlaggedEvent } from '../types';
-import { ShieldAlert, CheckCircle, Clock, Settings, Mic2, Lock, X } from 'lucide-react';
+import { ShieldAlert, CheckCircle, Clock, Settings, Mic2, Lock, X, Trash2 } from 'lucide-react';
 import { AVAILABLE_VOICES } from '../constants';
 
 interface ParentDashboardProps {
@@ -8,12 +8,14 @@ interface ParentDashboardProps {
   onClose: () => void;
   voiceName: string;
   onVoiceChange: (voice: string) => void;
+  onClearHistory: () => void;
 }
 
-const ParentDashboard: React.FC<ParentDashboardProps> = ({ events, onClose, voiceName, onVoiceChange }) => {
+const ParentDashboard: React.FC<ParentDashboardProps> = ({ events, onClose, voiceName, onVoiceChange, onClearHistory }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +92,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ events, onClose, voic
       <div className="bg-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-700 max-h-[90vh] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
         
         {/* Header */}
-        <div className="p-6 border-b border-slate-700 flex justify-between items-center">
+        <div className="p-6 border-b border-slate-700 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-3">
             <ShieldAlert className="w-8 h-8 text-rose-500" />
             <div>
@@ -116,28 +118,71 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ events, onClose, voic
               <h3 className="font-semibold">App Configuration</h3>
             </div>
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-purple-500/20 p-2 rounded-lg">
-                   <Mic2 className="w-6 h-6 text-purple-400" />
+            <div className="space-y-4">
+              {/* Voice Selector */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-purple-500/20 p-2 rounded-lg">
+                     <Mic2 className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <div className="text-slate-200 font-medium">Maya's Voice</div>
+                    <div className="text-slate-500 text-xs">Choose the persona that fits best.</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-slate-200 font-medium">Maya's Voice</div>
-                  <div className="text-slate-500 text-xs">Choose the persona that fits best.</div>
-                </div>
+                
+                <select 
+                  value={voiceName}
+                  onChange={(e) => onVoiceChange(e.target.value)}
+                  className="bg-slate-800 text-white border border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                >
+                  {AVAILABLE_VOICES.map((voice) => (
+                    <option key={voice.name} value={voice.name}>
+                      {voice.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-              
-              <select 
-                value={voiceName}
-                onChange={(e) => onVoiceChange(e.target.value)}
-                className="bg-slate-800 text-white border border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-              >
-                {AVAILABLE_VOICES.map((voice) => (
-                  <option key={voice.name} value={voice.name}>
-                    {voice.label}
-                  </option>
-                ))}
-              </select>
+
+              {/* Clear History */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="bg-rose-500/20 p-2 rounded-lg">
+                     <Trash2 className="w-6 h-6 text-rose-400" />
+                  </div>
+                  <div>
+                    <div className="text-slate-200 font-medium">Clear Activity Data</div>
+                    <div className="text-slate-500 text-xs">Deletes all chat history and safety logs.</div>
+                  </div>
+                </div>
+                
+                {showClearConfirm ? (
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setShowClearConfirm(false)}
+                      className="px-3 py-2 text-xs text-slate-400 hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={() => {
+                        onClearHistory();
+                        setShowClearConfirm(false);
+                      }}
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition-colors"
+                    >
+                      Confirm Delete
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => setShowClearConfirm(true)}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white text-xs font-medium rounded-lg transition-colors"
+                  >
+                    Clear History
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -191,9 +236,9 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ events, onClose, voic
 
         </div>
         
-        <div className="p-4 bg-slate-900/50 border-t border-slate-700 rounded-b-2xl text-xs text-slate-500 flex gap-2">
+        <div className="p-4 bg-slate-900/50 border-t border-slate-700 rounded-b-2xl text-xs text-slate-500 flex gap-2 shrink-0">
            <Clock className="w-4 h-4" />
-           <span>Monitoring active. Logs are stored locally for this session only.</span>
+           <span>Monitoring active. Logs are stored locally on this device.</span>
         </div>
       </div>
     </div>
