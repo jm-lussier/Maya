@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { FlaggedEvent } from '../types';
-import { ShieldAlert, CheckCircle, Clock, Settings, Mic2, Lock, X, Trash2 } from 'lucide-react';
+import { FlaggedEvent, Message } from '../types';
+import { ShieldAlert, CheckCircle, Clock, Settings, Mic2, Lock, X, Trash2, Download } from 'lucide-react';
 import { AVAILABLE_VOICES } from '../constants';
 
 interface ParentDashboardProps {
   events: FlaggedEvent[];
+  messages: Message[];
   onClose: () => void;
   voiceName: string;
   onVoiceChange: (voice: string) => void;
   onClearHistory: () => void;
 }
 
-const ParentDashboard: React.FC<ParentDashboardProps> = ({ events, onClose, voiceName, onVoiceChange, onClearHistory }) => {
+const ParentDashboard: React.FC<ParentDashboardProps> = ({ events, messages, onClose, voiceName, onVoiceChange, onClearHistory }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,6 +27,35 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ events, onClose, voic
       setError('Incorrect PIN');
       setPassword('');
     }
+  };
+
+  const handleExport = () => {
+    const timestamp = new Date().toLocaleString();
+    let report = `MAYA SAFETY REPORT\nGenerated: ${timestamp}\n\n`;
+    
+    report += `=== FLAGGED EVENTS (${events.length}) ===\n`;
+    if (events.length === 0) {
+      report += "No safety flags detected.\n";
+    } else {
+      events.forEach(e => {
+        report += `[${e.severity.toUpperCase()}] ${e.timestamp.toLocaleString()} - Keyword: "${e.keyword}"\nContext: "${e.context}"\n\n`;
+      });
+    }
+
+    report += `\n=== CONVERSATION HISTORY (${messages.length} messages) ===\n`;
+    messages.forEach(m => {
+      report += `[${m.timestamp.toLocaleString()}] ${m.role.toUpperCase()}: ${m.text}\n`;
+    });
+
+    const blob = new Blob([report], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `maya-report-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   if (!isAuthenticated) {
@@ -142,6 +172,26 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ events, onClose, voic
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Data Management Actions */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-500/20 p-2 rounded-lg">
+                     <Download className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <div className="text-slate-200 font-medium">Export Report</div>
+                    <div className="text-slate-500 text-xs">Download logs to view on another device.</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleExport}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Save as File
+                </button>
               </div>
 
               {/* Clear History */}
