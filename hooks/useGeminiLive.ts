@@ -92,6 +92,13 @@ export const useGeminiLive = () => {
     }
   }, []);
 
+  const clearHistory = useCallback(() => {
+    setMessages([]);
+    setFlaggedEvents([]);
+    localStorage.removeItem('maya-messages');
+    localStorage.removeItem('maya-events');
+  }, []);
+
   const connect = useCallback(async () => {
     console.log("Attempting to connect with voice:", voiceName);
     setError(null);
@@ -349,6 +356,7 @@ export const useGeminiLive = () => {
     volume,
     error,
     voiceName,
-    setVoiceName
+    setVoiceName,
+    clearHistory
   };
 };
