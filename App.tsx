@@ -64,6 +64,7 @@ const App: React.FC = () => {
       {showDashboard && (
         <ParentDashboard 
           events={flaggedEvents}
+          messages={messages}
           onClose={() => setShowDashboard(false)}
           voiceName={voiceName}
           onVoiceChange={setVoiceName}
