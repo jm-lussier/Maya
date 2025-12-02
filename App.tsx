@@ -14,7 +14,8 @@ const App: React.FC = () => {
     volume,
     error,
     voiceName,
-    setVoiceName
+    setVoiceName,
+    clearHistory
   } = useGeminiLive();
 
   const [showDashboard, setShowDashboard] = useState(false);
@@ -66,6 +67,7 @@ const App: React.FC = () => {
           onClose={() => setShowDashboard(false)}
           voiceName={voiceName}
           onVoiceChange={setVoiceName}
+          onClearHistory={clearHistory}
         />
       )}
     </div>
